@@ -1,0 +1,60 @@
+import { peerIdFromString } from '@libp2p/peer-id';
+import { Signal } from '@preact/signals';
+import { type ILogService, ILogServiceSymbol, uuid } from '@undyingwraith/jaaf-core';
+import { inject, injectable } from 'inversify';
+import { ILibp2pServiceSymbol, Libp2pService } from './Libp2pService';
+
+export const FileTransferServiceSymbol = Symbol.for('FileTransferService');
+
+@injectable()
+export class FileTransferService {
+	constructor(
+		@inject(ILibp2pServiceSymbol) private readonly transport: Libp2pService,
+		@inject(ILogServiceSymbol) private readonly log: ILogService,
+	) {
+		this.transport.libp2p.handle(this.protocol, (conn) => {
+			console.log(conn);
+		});
+	}
+
+	async startTransfer(files: FileList, recipients: string[]) {
+		const transfer: ITransfer = {
+			id: uuid(),
+			direction: 'outgoing',
+			status: 'connecting',
+		};
+		this.transfers.value = [...this.transfers.value, transfer];
+
+		console.log('starting transfer to', recipients);
+		for (const recipient of recipients) {
+			const peerId = peerIdFromString(recipient);
+
+			const info = await this.transport.libp2p.peerRouting.findPeer(peerId);
+			this.log.debug(`Found peer '${peerId.toString()}'`);
+
+			const conn = await this.transport.libp2p.dial(info.multiaddrs);
+			this.log.debug(`Connected to peer '${peerId.toString()}'`);
+
+			// Update status
+			this.transfers.value = this.transfers.value.map(t => t.id === transfer.id ? { ...t, status: 'waiting' } : t);
+
+			console.log('connected to peer');
+			const stream = await conn.newStream(this.protocol);
+			if (stream instanceof WritableStream) {
+				const writer = stream.getWriter();
+				writer.write('test');
+			}
+			console.log(stream);
+		}
+	}
+
+	public readonly transfers = new Signal<ITransfer[]>([]);
+
+	private readonly protocol = '/x/file-transfer/1';
+}
+
+export interface ITransfer {
+	id: string;
+	direction: 'incoming' | 'outgoing';
+	status: 'connecting' | 'waiting' | 'transfering' | 'completed' | 'aborted';
+}

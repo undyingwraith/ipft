@@ -1,0 +1,15 @@
+# Logs
+logs
+*.log
+yarn-debug.log*
+yarn-error.log*
+# Yarn files
+.yarn/*
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+dist
+node_modules
+*.local

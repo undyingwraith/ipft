@@ -1,0 +1,1 @@
+export { FileShareWidget } from './FileShareWidget';

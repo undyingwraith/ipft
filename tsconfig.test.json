@@ -1,0 +1,39 @@
+{
+	"compilerOptions": {
+		"sourceRoot": "./src",
+		"allowJs": false,
+		"declaration": true,
+		"emitDecoratorMetadata": true,
+		"emitDeclarationOnly": false,
+		"declarationMap": true,
+		"esModuleInterop": true,
+		"experimentalDecorators": true,
+		"forceConsistentCasingInFileNames": true,
+		"outDir": "./dist",
+		"lib": [
+			"esnext",
+			"dom",
+			"dom.iterable"
+		],
+		"moduleResolution": "node",
+		"noImplicitAny": true,
+		"noImplicitReturns": true,
+		"noImplicitThis": true,
+		"noUnusedLocals": true,
+		"sourceMap": true,
+		"strictNullChecks": true,
+		"resolveJsonModule": true,
+		"module": "esnext",
+		"target": "ESNext",
+		"downlevelIteration": true,
+		"isolatedModules": true,
+		"baseUrl": ".",
+		"jsx": "react-jsx",
+		"jsxImportSource": "preact",
+		"skipLibCheck": true
+	},
+	"include": [
+		"src",
+		"vite.config.ts"
+	]
+}

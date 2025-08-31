@@ -1,0 +1,1 @@
+export { AddFriendWidget } from './AddFriendWidget';
