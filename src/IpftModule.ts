@@ -1,10 +1,17 @@
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
+import { noise } from '@chainsafe/libp2p-noise';
+import { yamux } from '@chainsafe/libp2p-yamux';
 import { bootstrap } from '@libp2p/bootstrap';
+import { circuitRelayTransport } from '@libp2p/circuit-relay-v2';
 import { identify, identifyPush } from '@libp2p/identify';
 import { kadDHT, removePrivateAddressesMapper, removePublicAddressesMapper } from '@libp2p/kad-dht';
-import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
-import { IModule, ITranslation, ITranslationsSymbol } from '@undyingwraith/jaaf-core';
 import { ping } from '@libp2p/ping';
+import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
+import { webRTC, webRTCDirect } from '@libp2p/webrtc';
+import { webSockets } from '@libp2p/websockets';
+import { all } from '@libp2p/websockets/filters';
+import { webTransport } from '@libp2p/webtransport';
+import { IModule, ITranslation, ITranslationsSymbol } from '@undyingwraith/jaaf-core';
 import { FileTransferService, FileTransferServiceSymbol, FriendsService, IFriendsService, IFriendsServiceSymbol, ILibp2pConfig, ILibp2pConfigSymbol, ILibp2pServiceSymbol, Libp2pService } from './Services';
 import translations from './translations';
 
@@ -15,6 +22,25 @@ export const IpftModule: IModule = async (app) => {
 	await app.register(FileTransferService, FileTransferServiceSymbol);
 	await app.register(Libp2pService, ILibp2pServiceSymbol);
 	await app.registerConstant<ILibp2pConfig>({
+		addresses: {
+			listen: [
+				'/p2p-circuit',
+				'/webrtc',
+			],
+		},
+		transports: [
+			circuitRelayTransport(),
+			webRTC(),
+			webRTCDirect(),
+			webTransport(),
+			webSockets({
+				filter: all
+			}),
+		],
+		streamMuxers: [
+			yamux(),
+		],
+		connectionEncrypters: [noise()],
 		peerDiscovery: [
 			bootstrap({
 				list: [
@@ -23,6 +49,7 @@ export const IpftModule: IModule = async (app) => {
 					'/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
 					'/dnsaddr/va1.bootstrap.libp2p.io/p2p/12D3KooWKnDdG3iXw9eTFijk3EWSunZcFi54Zka4wmtqtt6rPxc8',
 					'/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
+					'/ip4/185.66.109.132/tcp/4001/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
 				],
 			}),
 			pubsubPeerDiscovery(),
