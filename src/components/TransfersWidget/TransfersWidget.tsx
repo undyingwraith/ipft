@@ -15,6 +15,7 @@ export function TransfersWidget() {
 						<b>{t.id}</b>
 						{t.direction === 'outgoing' ? 'Outbound' : 'Inbound'}
 						<b>{t.status}</b>
+						{t.error && <div><b>{t.error.name}</b>: {t.error.message}</div>}
 						<ButtonGroup>
 							{t.status !== 'completed' && t.status !== 'failed' && <Button>Abort</Button>}
 							{t.status === 'failed' && <Button>Retry</Button>}

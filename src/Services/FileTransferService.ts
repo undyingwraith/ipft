@@ -53,12 +53,12 @@ export class FileTransferService {
 			}
 		} catch (ex: any) {
 			this.log.error(ex);
-			this.updateStatus(transfer.id, 'failed');
+			this.updateStatus(transfer.id, 'failed', ex);
 		}
 	}
 
-	private updateStatus(id: string, status: TStatus) {
-		this.transfers.value = this.transfers.value.map(t => t.id === id ? { ...t, status } : t);
+	private updateStatus(id: string, status: TStatus, error?: Error) {
+		this.transfers.value = this.transfers.value.map(t => t.id === id ? { ...t, status, error } : t);
 	}
 
 	public readonly transfers = new Signal<ITransfer[]>([]);
@@ -72,4 +72,5 @@ export interface ITransfer {
 	id: string;
 	direction: 'incoming' | 'outgoing';
 	status: TStatus;
+	error?: Error;
 }
