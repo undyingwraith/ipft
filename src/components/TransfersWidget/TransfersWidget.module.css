@@ -1,0 +1,14 @@
+.container,
+.list {
+	display: flex;
+	flex-direction: column;
+}
+
+.list {
+	overflow: auto;
+}
+
+.item {
+	display: flex;
+	flex-direction: column;
+}

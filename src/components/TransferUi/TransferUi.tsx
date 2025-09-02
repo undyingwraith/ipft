@@ -5,7 +5,7 @@ import { FriendsWidget } from '../FriendsWidget';
 import { ThemeButton } from '../ThemeButton';
 import styles from './TransferUi.module.css';
 import { Libp2pService, ILibp2pServiceSymbol } from '../../Services';
-import { ActiveTransfers } from '../ActiveTransfers';
+import { TransfersWidget } from '../TransfersWidget';
 
 export function TransferUi() {
 	const libp2pService = useService<Libp2pService>(ILibp2pServiceSymbol);
@@ -19,7 +19,7 @@ export function TransferUi() {
 				<ThemeButton />
 			</div>
 			<div class={styles.main}>
-				<ActiveTransfers />
+				<TransfersWidget />
 				<FriendsWidget />
 				<FileShareWidget />
 			</div>

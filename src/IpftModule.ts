@@ -50,6 +50,7 @@ export const IpftModule: IModule = async (app) => {
 					'/dnsaddr/va1.bootstrap.libp2p.io/p2p/12D3KooWKnDdG3iXw9eTFijk3EWSunZcFi54Zka4wmtqtt6rPxc8',
 					'/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
 					'/ip4/185.66.109.132/tcp/4001/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
+					'/ip4/185.66.109.132/tcp/6001/WS/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
 				],
 			}),
 			pubsubPeerDiscovery(),
