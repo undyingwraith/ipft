@@ -1,9 +1,10 @@
 import { useComputed } from '@preact/signals';
-import { Button, ButtonGroup, useService } from '@undyingwraith/jaaf-ui';
+import { Button, ButtonGroup, useService, useTranslation } from '@undyingwraith/jaaf-ui';
 import { FileTransferService, FileTransferServiceSymbol } from '../../Services';
 import styles from './TransfersWidget.module.css';
 
 export function TransfersWidget() {
+	const _t = useTranslation();
 	const transferService = useService<FileTransferService>(FileTransferServiceSymbol);
 
 	return (
@@ -19,7 +20,13 @@ export function TransfersWidget() {
 						<ButtonGroup>
 							{t.status !== 'completed' && t.status !== 'failed' && <Button>Abort</Button>}
 							{t.status === 'failed' && <Button>Retry</Button>}
-							{(t.status === 'completed' || t.status === 'failed') && <Button>Remove</Button>}
+							{(t.status === 'completed' || t.status === 'failed') && (
+								<Button
+									onClick={() => transferService.clearTransfer(t.id)}
+								>
+									{_t('Remove')}
+								</Button>
+							)}
 						</ButtonGroup>
 					</div>
 				)))}

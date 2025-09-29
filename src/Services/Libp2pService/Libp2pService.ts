@@ -1,3 +1,4 @@
+import { Connection, DialOptions, PeerId } from '@libp2p/interface';
 import { Signal } from '@preact/signals';
 import { type ILogService, ILogServiceSymbol } from '@undyingwraith/jaaf-core';
 import { inject, injectable, multiInject, optional, preDestroy } from 'inversify';
@@ -39,6 +40,11 @@ export class Libp2pService implements ILibp2pService {
 				handler.handle(data);
 			});
 		}
+	}
+
+	public async dial(id: PeerId, options?: DialOptions): Promise<Connection> {
+		const info = await this.libp2p.peerRouting.findPeer(id);
+		return this.libp2p.dial(info.multiaddrs, options);
 	}
 
 	public get libp2p() {

@@ -1,3 +1,4 @@
+import { Connection, Stream } from '@libp2p/interface';
 import { peerIdFromString } from '@libp2p/peer-id';
 import { Signal } from '@preact/signals';
 import { type ILogService, ILogServiceSymbol, uuid } from '@undyingwraith/jaaf-core';
@@ -12,9 +13,14 @@ export class FileTransferService {
 		@inject(ILibp2pServiceSymbol) private readonly transport: Libp2pService,
 		@inject(ILogServiceSymbol) private readonly log: ILogService,
 	) {
-		this.transport.libp2p.handle(this.protocol, (conn) => {
-			console.log(conn);
-		});
+		this.handleStream = this.handleStream.bind(this);
+	}
+
+	public async init(): Promise<void> {
+		this.log.debug(`Registering protocol handler '${this.protocol}'...`);
+		await this.transport.libp2p.handle(this.protocol, this.handleStream);
+		console.log(this.transport.libp2p.getProtocols());
+		this.log.debug('Registered protocol handler!');
 	}
 
 	async startTransfer(files: FileList, recipients: string[]) {
@@ -30,18 +36,20 @@ export class FileTransferService {
 			for (const recipient of recipients) {
 				const peerId = peerIdFromString(recipient);
 
-				const info = await this.transport.libp2p.peerRouting.findPeer(peerId);
-				this.log.debug(`Found peer '${peerId.toString()}'`);
+				/*
+				const conn = await this.transport.dial(peerId);
+				console.log(conn.streams);
+				const stream = await conn.newStream(this.protocol);
+				*/
 
-				const conn = await this.transport.libp2p.dial(info.multiaddrs);
-				this.log.debug(`Connected to peer '${peerId.toString()}'`);
+				const info = await this.transport.libp2p.peerRouting.findPeer(peerId);
+				const stream = await this.transport.libp2p.dialProtocol(info.multiaddrs, this.protocol);
 
 				// Update status
 				this.updateStatus(transfer.id, 'waiting');
 
-				console.log('connected to peer');
-				const stream = await conn.newStream(this.protocol);
 				if (stream instanceof WritableStream) {
+					console.log('writing');
 					const writer = stream.getWriter();
 					writer.write('test');
 				}
@@ -57,13 +65,29 @@ export class FileTransferService {
 		}
 	}
 
+	public clearTransfer(id: string) {
+		this.transfers.value = this.transfers.value.filter(i => i.id !== id);
+	}
+
+	private handleStream(stream: Stream, connection: Connection) {
+		console.log('protocol init', connection);
+		stream.addEventListener('message', (evt: any) => {
+			console.log(evt);
+			stream.send(evt.data);
+		});
+
+		stream.addEventListener('remoteCloseWrite', () => {
+			stream.close();
+		});
+	}
+
 	private updateStatus(id: string, status: TStatus, error?: Error) {
 		this.transfers.value = this.transfers.value.map(t => t.id === id ? { ...t, status, error } : t);
 	}
 
 	public readonly transfers = new Signal<ITransfer[]>([]);
 
-	private readonly protocol = '/x/file-transfer/1';
+	private readonly protocol = '/ipft/transfer/1';
 }
 
 type TStatus = 'connecting' | 'waiting' | 'transfering' | 'completed' | 'failed';

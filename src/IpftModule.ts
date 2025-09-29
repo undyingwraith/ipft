@@ -9,10 +9,10 @@ import { ping } from '@libp2p/ping';
 import { pubsubPeerDiscovery } from '@libp2p/pubsub-peer-discovery';
 import { webRTC, webRTCDirect } from '@libp2p/webrtc';
 import { webSockets } from '@libp2p/websockets';
-import { all } from '@libp2p/websockets/filters';
 import { webTransport } from '@libp2p/webtransport';
 import { IModule, ITranslation, ITranslationsSymbol } from '@undyingwraith/jaaf-core';
-import { FileTransferService, FileTransferServiceSymbol, FriendsService, IFriendsService, IFriendsServiceSymbol, ILibp2pConfig, ILibp2pConfigSymbol, ILibp2pServiceSymbol, Libp2pService } from './Services';
+import { Libp2pInit } from 'libp2p';
+import { FileTransferService, FileTransferServiceSymbol, FriendsService, IFriendsService, IFriendsServiceSymbol, ILibp2pConfigSymbol, ILibp2pServiceSymbol, Libp2pService } from './Services';
 import translations from './translations';
 
 export const IpftModule: IModule = async (app) => {
@@ -21,7 +21,7 @@ export const IpftModule: IModule = async (app) => {
 	await app.register<IFriendsService>(FriendsService, IFriendsServiceSymbol);
 	await app.register(FileTransferService, FileTransferServiceSymbol);
 	await app.register(Libp2pService, ILibp2pServiceSymbol);
-	await app.registerConstant<ILibp2pConfig>({
+	await app.registerConstant<Libp2pInit<any>>({
 		addresses: {
 			listen: [
 				'/p2p-circuit',
@@ -29,28 +29,32 @@ export const IpftModule: IModule = async (app) => {
 			],
 		},
 		transports: [
-			circuitRelayTransport(),
+			webTransport(),
+			webSockets(),
 			webRTC(),
 			webRTCDirect(),
-			webTransport(),
-			webSockets({
-				filter: all
-			}),
+			circuitRelayTransport(),
 		],
 		streamMuxers: [
 			yamux(),
 		],
-		connectionEncrypters: [noise()],
+		connectionEncrypters: [
+			noise(),
+		],
+		connectionGater: {
+			// Allow private addresses for local testing
+			denyDialMultiaddr: async () => false,
+		},
 		peerDiscovery: [
 			bootstrap({
 				list: [
-					'/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
+					/*'/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',
 					'/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',
 					'/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',
 					'/dnsaddr/va1.bootstrap.libp2p.io/p2p/12D3KooWKnDdG3iXw9eTFijk3EWSunZcFi54Zka4wmtqtt6rPxc8',
 					'/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
-					'/ip4/185.66.109.132/tcp/4001/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
-					'/ip4/185.66.109.132/tcp/6001/WS/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
+					'/ip4/185.66.109.132/tcp/4001/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',*/
+					'/ip4/185.66.109.132/tcp/6001/ws/p2p/12D3KooWPUFuhVZ1YnKrG49TtCWNmaxUag6q2JhBbabRCMJhoDLo',
 				],
 			}),
 			pubsubPeerDiscovery(),
@@ -80,5 +84,9 @@ export const IpftModule: IModule = async (app) => {
 			}),
 		},
 	}, ILibp2pConfigSymbol);
+
+	// Startup actions
 	app.registerStartupAction((app) => app.getService<Libp2pService>(ILibp2pServiceSymbol).start());
+	app.registerStartupAction((app) => app.getService<FriendsService>(IFriendsServiceSymbol).start());
+	app.registerStartupAction((app) => app.getService<FileTransferService>(FileTransferServiceSymbol).init());
 };
