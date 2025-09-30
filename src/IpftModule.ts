@@ -11,8 +11,8 @@ import { webRTC, webRTCDirect } from '@libp2p/webrtc';
 import { webSockets } from '@libp2p/websockets';
 import { webTransport } from '@libp2p/webtransport';
 import { IModule, ITranslation, ITranslationsSymbol } from '@undyingwraith/jaaf-core';
-import { Libp2pInit } from 'libp2p';
-import { FileTransferService, FileTransferServiceSymbol, FriendsService, IFriendsService, IFriendsServiceSymbol, ILibp2pConfigSymbol, ILibp2pServiceSymbol, Libp2pService } from './Services';
+import { IDBDatastore } from 'datastore-idb';
+import { FileTransferService, FileTransferServiceSymbol, FriendsService, IDatastoreSymbol, IFriendsService, IFriendsServiceSymbol, ILibp2pConfig, ILibp2pConfigSymbol, ILibp2pServiceSymbol, Libp2pService } from './Services';
 import translations from './translations';
 
 export const IpftModule: IModule = async (app) => {
@@ -21,7 +21,7 @@ export const IpftModule: IModule = async (app) => {
 	await app.register<IFriendsService>(FriendsService, IFriendsServiceSymbol);
 	await app.register(FileTransferService, FileTransferServiceSymbol);
 	await app.register(Libp2pService, ILibp2pServiceSymbol);
-	await app.registerConstant<Libp2pInit<any>>({
+	await app.registerConstant<ILibp2pConfig<any>>({
 		addresses: {
 			listen: [
 				'/p2p-circuit',
@@ -84,8 +84,10 @@ export const IpftModule: IModule = async (app) => {
 			}),
 		},
 	}, ILibp2pConfigSymbol);
+	app.registerConstant<any>(new IDBDatastore('libp2p-data'), IDatastoreSymbol);
 
 	// Startup actions
+	app.registerStartupAction((app) => app.getService<IDBDatastore>(IDatastoreSymbol).open());
 	app.registerStartupAction((app) => app.getService<Libp2pService>(ILibp2pServiceSymbol).start());
 	app.registerStartupAction((app) => app.getService<FriendsService>(IFriendsServiceSymbol).start());
 	app.registerStartupAction((app) => app.getService<FileTransferService>(FileTransferServiceSymbol).init());

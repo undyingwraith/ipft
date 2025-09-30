@@ -1,3 +1,3 @@
-export { type ILibp2pConfig, ILibp2pConfigSymbol } from './ILibp2pConfig';
-export { type ILibp2pService, ILibp2pServiceSymbol } from './ILibp2pService';
-export { Libp2pService } from './Libp2pService';
+export { ILibp2pConfigSymbol, type ILibp2pConfig } from './ILibp2pConfig';
+export { ILibp2pServiceSymbol, type ILibp2pService } from './ILibp2pService';
+export { IDatastoreSymbol, Libp2pService } from './Libp2pService';
