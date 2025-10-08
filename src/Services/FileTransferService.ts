@@ -1,5 +1,6 @@
 import { Connection, Stream } from '@libp2p/interface';
 import { peerIdFromString } from '@libp2p/peer-id';
+import { decode, encode } from "@msgpack/msgpack";
 import { Signal } from '@preact/signals';
 import { type ILogService, ILogServiceSymbol, uuid } from '@undyingwraith/jaaf-core';
 import { inject, injectable } from 'inversify';
@@ -28,6 +29,7 @@ export class FileTransferService {
 			id: uuid(),
 			direction: 'outgoing',
 			status: 'connecting',
+			files: files,
 		};
 		this.transfers.value = [...this.transfers.value, transfer];
 
@@ -36,28 +38,22 @@ export class FileTransferService {
 			for (const recipient of recipients) {
 				const peerId = peerIdFromString(recipient);
 
-				/*
 				const conn = await this.transport.dial(peerId);
-				console.log(conn.streams);
 				const stream = await conn.newStream(this.protocol);
-				*/
-
-				const info = await this.transport.libp2p.peerRouting.findPeer(peerId);
-				const stream = await this.transport.libp2p.dialProtocol(info.multiaddrs, this.protocol);
 
 				// Update status
 				this.updateStatus(transfer.id, 'waiting');
 
-				if (stream instanceof WritableStream) {
-					console.log('writing');
-					const writer = stream.getWriter();
-					writer.write('test');
-				}
-				console.log(stream);
+				const request: IRequest = {
+					filename: files.item(0)?.name ?? 'unknown',
+					id: transfer.id,
+				};
+				// Send transfer request
+				stream.send(encode(request));
+				this.updateStatus(transfer.id, 'waiting');
 
-				//TODO: actually initiate the transfer once partner has accepted
-
-				this.updateStatus(transfer.id, 'completed');
+				// Handle responses
+				this.handleStream(stream, conn);
 			}
 		} catch (ex: any) {
 			this.log.error(ex);
@@ -71,9 +67,50 @@ export class FileTransferService {
 
 	private handleStream(stream: Stream, connection: Connection) {
 		console.log('protocol init', connection);
-		stream.addEventListener('message', (evt: any) => {
-			console.log(evt);
-			stream.send(evt.data);
+		stream.addEventListener('message', async (evt) => {
+			console.log('message received', evt);
+			const data = decode(evt.data.subarray());
+			if (isIRequest(data)) {
+				console.log('request received', data);
+				this.transfers.value = [...this.transfers.value, {
+					id: data.id,
+					direction: 'incoming',
+					status: 'waiting',
+				}];
+				const accepted = window.confirm(`${connection.remotePeer.toString()} wants to send you '${data.filename}'!`);
+				stream.send(encode({
+					id: data.id,
+					response: accepted ? 'accepted' : 'declined',
+				} as IResponse));
+			} else if (isIResponse(data)) {
+				console.log('response received', data);
+				if (data.response === 'accepted') {
+					this.updateStatus(data.id, 'transfering');
+					const transfer = this.transfers.value.find(t => t.id === data.id);
+					if (transfer && transfer.files) {
+						const files: IFile[] = [];
+						for (let i = 0; i < transfer.files.length; i++) {
+							const f = transfer.files.item(i)!;
+							files.push({
+								filename: f.name,
+								content: await readFile(f),
+							});
+						}
+						const fileTransfer: IFileTransfer = {
+							id: data.id,
+							files,
+						};
+						stream.send(encode(fileTransfer));
+					}
+					//TODO: error handling
+				} else {
+					this.updateStatus(data.id, 'declined');
+				}
+				//TODO: send file
+			} else if (isIFileTransfer(data)) {
+				console.log('transfer received', data);
+				//TODO: handle files
+			}
 		});
 
 		stream.addEventListener('remoteCloseWrite', () => {
@@ -87,14 +124,60 @@ export class FileTransferService {
 
 	public readonly transfers = new Signal<ITransfer[]>([]);
 
-	private readonly protocol = '/ipft/transfer/1';
+	private readonly protocol = '/ipft/transfer/1.0.0';
 }
 
-type TStatus = 'connecting' | 'waiting' | 'transfering' | 'completed' | 'failed';
+export function readFile(file: File): Promise<ArrayBuffer> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			resolve(reader.result as ArrayBuffer);
+		};
+		reader.onerror = () => reject();
+		reader.readAsArrayBuffer(file);
+	});
+}
+
+type TStatus = 'connecting' | 'waiting' | 'transfering' | 'completed' | 'failed' | 'declined';
+type TResponseStatus = 'accepted' | 'declined' | 'failed' | 'completed';
 
 export interface ITransfer {
 	id: string;
 	direction: 'incoming' | 'outgoing';
 	status: TStatus;
+	files?: FileList;
 	error?: Error;
+}
+
+export interface IFile {
+	filename: string;
+	content: ArrayBuffer;
+}
+
+export interface IFileTransfer {
+	id: string;
+	files: IFile[];
+}
+
+export function isIFileTransfer(item: any): item is IFileTransfer {
+	return typeof item.id === 'string' && typeof item.files?.length === 'number';
+}
+
+
+export interface IResponse {
+	id: string;
+	response: TResponseStatus;
+}
+
+export function isIResponse(item: any): item is IResponse {
+	return typeof item.id === 'string' && typeof item.response === 'string';
+}
+
+export interface IRequest {
+	id: string;
+	filename: string;
+}
+
+export function isIRequest(item: any): item is IRequest {
+	return typeof item.id === 'string' && typeof item.filename === 'string';
 }

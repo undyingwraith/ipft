@@ -31,4 +31,8 @@ export default defineConfig(({ mode }) => ({
 		manifest: false,
 		minify: mode == 'dev' ? 'esbuild' : 'terser',
 	},
+	server: {
+		port: 5174,
+		host: true,
+	},
 }));

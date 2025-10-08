@@ -1,5 +1,6 @@
 import { loadOrCreateSelfKey } from '@libp2p/config';
-import { Connection, DialOptions, PeerId } from '@libp2p/interface';
+import { Connection, DialOptions, PeerId, PeerInfo } from '@libp2p/interface';
+import { Multiaddr } from '@multiformats/multiaddr';
 import { Signal } from '@preact/signals';
 import { type ILogService, ILogServiceSymbol } from '@undyingwraith/jaaf-core';
 import { MemoryDatastore } from 'datastore-core';
@@ -52,20 +53,30 @@ export class Libp2pService implements ILibp2pService {
 	}
 
 	public async dial(id: PeerId, options?: DialOptions): Promise<Connection> {
-		const info = await this.libp2p.peerRouting.findPeer(id);
-		return this.libp2p.dial(info.multiaddrs, options);
+		let info = await this.libp2p.peerRouting.findPeer(id);
+		if (!await this.libp2p.isDialable(this.peerInfoToMultiAddr(info))) {
+			info = await this.libp2p.peerRouting.findPeer(id, {
+				useCache: false,
+			});
+		}
+
+		return this.libp2p.dial(this.peerInfoToMultiAddr(info), options);
 	}
 
 	public get libp2p() {
 		return this.node!;
 	}
 
-	public peers = new Signal<any[]>([]);
+	private peerInfoToMultiAddr(info: PeerInfo): Multiaddr[] {
+		return info.multiaddrs.map(a => a.encapsulate([{ code: 421, name: 'p2p', value: info.id.toString() }]));
+	}
 
 	@preDestroy()
 	private destroy() {
 		clearInterval(this.timer);
 	}
+
+	public peers = new Signal<any[]>([]);
 
 	private node?: Libp2p;
 	private timer?: any;
