@@ -4,7 +4,9 @@ import { decode, encode } from "@msgpack/msgpack";
 import { Signal } from '@preact/signals';
 import { type ILogService, ILogServiceSymbol, uuid } from '@undyingwraith/jaaf-core';
 import { inject, injectable } from 'inversify';
-import { ILibp2pServiceSymbol, Libp2pService } from './Libp2pService';
+import { ILibp2pServiceSymbol, Libp2pService } from '../Libp2pService';
+import { IFileInfo } from './IFileInfo';
+import { IFile } from './IFile';
 
 export const FileTransferServiceSymbol = Symbol.for('FileTransferService');
 
@@ -24,12 +26,12 @@ export class FileTransferService {
 		this.log.debug('Registered protocol handler!');
 	}
 
-	async startTransfer(files: FileList, recipients: string[]) {
+	async startTransfer(fileList: FileList, recipients: string[]) {
 		const transfer: ITransfer = {
 			id: uuid(),
 			direction: 'outgoing',
 			status: 'connecting',
-			files: files,
+			files: fileList,
 		};
 		this.transfers.value = [...this.transfers.value, transfer];
 
@@ -44,9 +46,19 @@ export class FileTransferService {
 				// Update status
 				this.updateStatus(transfer.id, 'waiting');
 
+				const files: IFileInfo[] = [];
+				for (let i = 0; i < fileList.length; i++) {
+					const f = fileList.item(i)!;
+					files.push({
+						mime: f.type,
+						name: f.name,
+						size: f.size,
+					});
+				}
 				const request: IRequest = {
-					filename: files.item(0)?.name ?? 'unknown',
 					id: transfer.id,
+					type: 'request',
+					files,
 				};
 				// Send transfer request
 				stream.send(encode(request));
@@ -66,22 +78,35 @@ export class FileTransferService {
 	}
 
 	private handleStream(stream: Stream, connection: Connection) {
-		console.log('protocol init', connection);
 		stream.addEventListener('message', async (evt) => {
-			console.log('message received', evt);
 			const data = decode(evt.data.subarray());
 			if (isIRequest(data)) {
-				console.log('request received', data);
-				this.transfers.value = [...this.transfers.value, {
-					id: data.id,
-					direction: 'incoming',
-					status: 'waiting',
-				}];
-				const accepted = window.confirm(`${connection.remotePeer.toString()} wants to send you '${data.filename}'!`);
-				stream.send(encode({
-					id: data.id,
-					response: accepted ? 'accepted' : 'declined',
-				} as IResponse));
+				if (data.type === 'request') {
+					console.log('request received', data);
+					this.transfers.value = [...this.transfers.value, {
+						id: data.id,
+						direction: 'incoming',
+						status: 'waiting',
+					}];
+					const accepted = window.confirm(`${connection.remotePeer.toString()} wants to send you ${data.files.map(f => `'${f.name}' ${f.size}`)}!`);
+					stream.send(encode({
+						id: data.id,
+						response: accepted ? 'accepted' : 'declined',
+					} as IResponse));
+				} else {
+					console.log('transfer received', data);
+					for (const f of data.files) {
+						//@ts-ignore
+						const blob = new Blob([f.content], { type: f.mime });
+						const url = URL.createObjectURL(blob);
+						const a = document.createElement("a");
+						a.download = f.name;
+						a.href = url;
+						a.click();
+
+						//TODO: revoke objecturl
+					}
+				}
 			} else if (isIResponse(data)) {
 				console.log('response received', data);
 				if (data.response === 'accepted') {
@@ -92,12 +117,15 @@ export class FileTransferService {
 						for (let i = 0; i < transfer.files.length; i++) {
 							const f = transfer.files.item(i)!;
 							files.push({
-								filename: f.name,
+								mime: f.type,
+								name: f.name,
+								size: f.size,
 								content: await readFile(f),
 							});
 						}
-						const fileTransfer: IFileTransfer = {
+						const fileTransfer: IRequest = {
 							id: data.id,
+							type: 'transfer',
 							files,
 						};
 						stream.send(encode(fileTransfer));
@@ -107,9 +135,6 @@ export class FileTransferService {
 					this.updateStatus(data.id, 'declined');
 				}
 				//TODO: send file
-			} else if (isIFileTransfer(data)) {
-				console.log('transfer received', data);
-				//TODO: handle files
 			}
 		});
 
@@ -127,11 +152,11 @@ export class FileTransferService {
 	private readonly protocol = '/ipft/transfer/1.0.0';
 }
 
-export function readFile(file: File): Promise<ArrayBuffer> {
+export function readFile(file: File): Promise<Uint8Array> {
 	return new Promise((resolve, reject) => {
 		const reader = new FileReader();
 		reader.onload = () => {
-			resolve(reader.result as ArrayBuffer);
+			resolve(new Uint8Array(reader.result as ArrayBuffer));
 		};
 		reader.onerror = () => reject();
 		reader.readAsArrayBuffer(file);
@@ -149,21 +174,6 @@ export interface ITransfer {
 	error?: Error;
 }
 
-export interface IFile {
-	filename: string;
-	content: ArrayBuffer;
-}
-
-export interface IFileTransfer {
-	id: string;
-	files: IFile[];
-}
-
-export function isIFileTransfer(item: any): item is IFileTransfer {
-	return typeof item.id === 'string' && typeof item.files?.length === 'number';
-}
-
-
 export interface IResponse {
 	id: string;
 	response: TResponseStatus;
@@ -173,11 +183,20 @@ export function isIResponse(item: any): item is IResponse {
 	return typeof item.id === 'string' && typeof item.response === 'string';
 }
 
-export interface IRequest {
+export type IRequest = IRequestRequest | ITransferRequest;
+
+export interface IRequestRequest {
 	id: string;
-	filename: string;
+	type: 'request';
+	files: IFileInfo[];
+}
+
+export interface ITransferRequest {
+	id: string;
+	type: 'transfer',
+	files: IFile[],
 }
 
 export function isIRequest(item: any): item is IRequest {
-	return typeof item.id === 'string' && typeof item.filename === 'string';
+	return typeof item.id === 'string' && typeof item.files?.length === 'number' && typeof item.type === 'string';
 }
